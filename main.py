@@ -25,6 +25,18 @@ YEAR_DECAY = 0.4
 V0_MIN_RATIO = 0.05
 LOWER_FLOOR = 1e-3
 
+# Hour-wise log bias correction, keyed by forecast hour.
+# Fitted as the median log residual per hour over four practice launch days,
+# then multiplied by a 0.7 shrinkage factor.  Leave-one-out validation on the
+# practice cases moved pinball log from 0.1705 to 0.1522.
+BIAS = {
+    2: -0.2175, 3: -0.1487, 4: +0.4716, 5: +0.4158, 6: +0.2951,
+    7: +0.2157, 8: +0.1281, 9: +0.0613, 10: +0.0868, 11: +0.0267,
+    12: +0.0626, 13: +0.0848, 14: +0.1278, 15: +0.1023, 16: +0.2106,
+    17: +0.2373, 18: +0.1376, 19: +0.0367, 20: -0.0190, 21: -0.0696,
+    22: -0.1175, 23: -0.2064,
+}
+
 
 def parse_ts(s):
     s = s.strip()
@@ -145,6 +157,7 @@ def forecast_one(data):
         a, b = wls(xsub, ysub, wsel)
 
         centre = a + b * math.log(p1) + 0.4 * max(0, h - 12) / 10.0
+        centre += BIAS.get(h, 0.0)
 
         resid = [
             (math.log(c[2][off]) - (a + b * math.log(c[1])), c[3])
