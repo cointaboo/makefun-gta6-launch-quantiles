@@ -179,6 +179,30 @@ def forecast_one(data):
                 q = prev
             qs.append(q)
             prev = q
+        # ---- widen the prediction interval (platform-measured coverage) ----
+        # The platform scores our coverage_90 at 0.80 against a nominal 90%,
+        # while the leaderboard sits at 0.93-0.98.  That says the interval is
+        # too narrow and the tails are what get penalised.  The local practice
+        # set cannot show this (its ground truth is labelled differently from
+        # the platform labels), so we trust the platform measurement and run a
+        # widening experiment here: keep the median (qs[2]) fixed as the anchor
+        # and push each side out by a factor on its log-distance from it --
+        # 1.30x for the 5%/95% tails (q0, q4) and 1.15x for the 25%/75%
+        # quartiles (q1, q3).  Log-space scaling keeps every bound positive and
+        # preserves the ordering, so the quantiles stay monotone.
+        anchor = qs[2]
+        if anchor > 0:
+            la = math.log(anchor)
+            widened = []
+            for i, z in enumerate(Z):
+                if z == 0.0:
+                    widened.append(qs[i])
+                    continue
+                factor = 1.30 if abs(z) > 1.0 else 1.15
+                q = round(math.exp(la + (math.log(max(qs[i], floor)) - la) * factor), 2)
+                widened.append(max(q, floor))
+            qs = widened
+
         rows.append({'hour': h, 'q': qs})
 
     return {'hours': rows}
